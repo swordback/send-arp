@@ -58,15 +58,18 @@ bool get_my_mac(std::string & strMac, char* dev) {
 }
 
 
-bool get_my_ip(std::string & myip) {
-	myip.clear();
-	system("hostname -I >> ip.txt");
-	ifstream ip_file("ip.txt");
-	if (ip_file.is_open() == false) {
-		return false;
-	}
-	ip_file >> myip;
-	ip_file.close();
+bool get_my_ip(std::string & myip, char* dev) {
+	int n;
+    struct ifreq ifr;
+ 
+    n = socket(AF_INET, SOCK_DGRAM, 0);
+    //Type of address to retrieve - IPv4 IP address
+    ifr.ifr_addr.sa_family = AF_INET;
+    //Copy the interface name in the ifreq structure
+    strncpy(ifr.ifr_name , dev , IFNAMSIZ - 1);
+    ioctl(n, SIOCGIFADDR, &ifr);
+	myip = inet_ntoa(( (struct sockaddr_in *)&ifr.ifr_addr )->sin_addr);
+    close(n);
 	return true;
 }
 
@@ -185,7 +188,7 @@ int main(int argc, char* argv[]) {
 	bool ismac = get_my_mac(mymac, dev);
 
 	string myip;
-	bool isip = get_my_ip(myip);
+	bool isip = get_my_ip(myip, dev);
 
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t* handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
