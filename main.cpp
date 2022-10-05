@@ -22,11 +22,11 @@ struct EthArpPacket final {
 #pragma pack(pop)
 
 void usage() {
-	printf("syntax: send-arp-test <interface>\n");
-	printf("sample: send-arp-test wlan0\n");
+	printf("syntax: send-arp-test <interface> <sender ip> <target ip> [<sender ip 2> <target ip 2> ...]\n");
+	printf("sample: send-arp-test wlan0 192.168.50.22 192.168.50.1\n");
 }
 
-bool get_my_mac(std::string & strMac) {
+bool get_my_mac(std::string & strMac, char* dev) {
 	// https://m.blog.naver.com/websearch/221811963830
 	unsigned char arrMac[6];
 	char szMac[51];
@@ -38,7 +38,7 @@ bool get_my_mac(std::string & strMac) {
 	int hSocket = socket( AF_INET, SOCK_DGRAM, IPPROTO_IP );
 	if (hSocket == -1) return false;
 
-	strcpy( ifr.ifr_name, "eth0" );
+	strcpy( ifr.ifr_name, dev );
 	if ( ioctl( hSocket, SIOCGIFHWADDR, &ifr ) == 0 )
 	{
 		memcpy( arrMac, ifr.ifr_hwaddr.sa_data, sizeof(arrMac) );
@@ -179,13 +179,13 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	char* dev = argv[1];
+
 	string mymac;
-	bool ismac = get_my_mac(mymac);
+	bool ismac = get_my_mac(mymac, dev);
 
 	string myip;
 	bool isip = get_my_ip(myip);
-
-	char* dev = argv[1];
 
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t* handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
