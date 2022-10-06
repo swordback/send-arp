@@ -73,7 +73,37 @@ bool get_my_ip(std::string & myip, char* dev) {
 	return true;
 }
 
+void send_arp_packet_3(pcap_t* handle, char* dev, Mac* eth_dmac,
+Mac* eth_smac, Mac* arp_smac, string* arp_sip, Mac* arp_tmac,
+string* arp_tip, int mode) {
+	EthArpPacket packet;
 
+	packet.eth_.dmac_ = *eth_dmac;
+	packet.eth_.smac_ = *eth_smac;
+	packet.eth_.type_ = htons(EthHdr::Arp);
+
+	packet.arp_.hrd_ = htons(ArpHdr::ETHER);
+	packet.arp_.pro_ = htons(EthHdr::Ip4);
+	packet.arp_.hln_ = Mac::SIZE;
+	packet.arp_.pln_ = Ip::SIZE;
+	if (mode == 0) {
+		packet.arp_.op_ = htons(ArpHdr::Request);
+	}
+	else {
+		packet.arp_.op_ = htons(ArpHdr::Reply);
+	}
+	packet.arp_.smac_ = *arp_smac;
+	packet.arp_.sip_ = htonl(Ip(*arp_sip));
+	packet.arp_.tmac_ = *arp_tmac;
+	packet.arp_.tip_ = htonl(Ip(*arp_tip));
+
+	int res = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
+	if (res != 0) {
+		fprintf(stderr, "pcap_sendpacket return %d error=%s\n", res, pcap_geterr(handle));
+	}
+}
+
+/*
 void send_arp_packet(pcap_t* handle, char* dev, string eth_dmac, string eth_smac,
 string arp_smac, string arp_sip, string arp_tmac, string arp_tip,
 int mode) {
@@ -133,6 +163,7 @@ int mode) {
 		fprintf(stderr, "pcap_sendpacket return %d error=%s\n", res, pcap_geterr(handle));
 	}
 }
+*/
 
 void get_arp_packet(pcap_t* handle, char* dev, string eth_dmac, 
 string eth_smac, Mac &arp_smac, string arp_sip, string arp_tmac, 
@@ -190,6 +221,9 @@ int main(int argc, char* argv[]) {
 	string myip;
 	bool isip = get_my_ip(myip, dev);
 
+	Mac smac_m;
+	Mac mymac_m = Mac(mymac);
+
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t* handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
 	if (handle == nullptr) {
@@ -197,16 +231,26 @@ int main(int argc, char* argv[]) {
 		exit(-1);
 	}
 
+	Mac allff = Mac("ff:ff:ff:ff:ff:ff");
+	Mac all00 = Mac("00:00:00:00:00:00");
 	for (int num = 0; num < (argc - 2) / 2; num++) {
-		send_arp_packet(handle, dev, "ff:ff:ff:ff:ff:ff", mymac, mymac, myip,
-	"00:00:00:00:00:00", sender_ip[0], 0);
+		send_arp_packet_3(handle, dev, &allff, &mymac_m, &mymac_m, &myip,
+	&all00, &sender_ip[num], 0);
 
-	Mac smac;
+	
 
-	get_arp_packet(handle, dev, mymac, target_ip[0], smac, sender_ip[0],
+	/*
+	get_arp_packet(handle, dev, mymac, target_ip[0], smac_m, sender_ip[0],
 	mymac, myip);
 
-	send_arp_packet_2(handle, dev, smac, mymac, mymac, target_ip[0], smac, sender_ip[0], 1);
+	send_arp_packet_2(handle, dev, smac_m, mymac, mymac, target_ip[0], smac_m, sender_ip[0], 1);
+	}
+	*/
+
+	get_arp_packet(handle, dev, mymac, target_ip[num], smac_m, sender_ip[num],
+	mymac, myip);
+
+	send_arp_packet_3(handle, dev, &smac_m, &mymac_m, &mymac_m, &target_ip[num], &smac_m, &sender_ip[num], 1);
 	}
 	
 	pcap_close(handle);
